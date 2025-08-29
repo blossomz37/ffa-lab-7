@@ -406,11 +406,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                             actualPromptPath = PROMPT_PATHS[params.promptFile];
                         }
                     }
-                    // Try relative path in docs/prompts
-                    if (!fs.existsSync(actualPromptPath) && !actualPromptPath.startsWith('/')) {
-                        const tryPath = path.join(__dirname, '../../docs/prompts', params.promptFile);
-                        if (fs.existsSync(tryPath)) {
-                            actualPromptPath = tryPath;
+                    // Try relative path in docs/prompts if it looks like a simple filename
+                    if (!fs.existsSync(actualPromptPath) && !path.isAbsolute(actualPromptPath)) {
+                        // Only look in prompts folder for simple filenames
+                        if (!actualPromptPath.includes('/') && !actualPromptPath.includes('\\')) {
+                            const tryPath = path.join(__dirname, '../../docs/prompts', params.promptFile);
+                            if (fs.existsSync(tryPath)) {
+                                actualPromptPath = tryPath;
+                            }
                         }
                     }
                     if (!fs.existsSync(actualPromptPath)) {
@@ -431,14 +434,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                             actualContentPath = PROMPT_PATHS[params.contentFile];
                         }
                     }
-                    if (!fs.existsSync(actualContentPath) && !actualContentPath.startsWith('/')) {
-                        const tryPath = path.join(__dirname, '../../docs/story', params.contentFile);
-                        if (fs.existsSync(tryPath)) {
-                            actualContentPath = tryPath;
+                    // Only use fallback if it's specifically requested via relative path
+                    if (!fs.existsSync(actualContentPath) && !path.isAbsolute(actualContentPath)) {
+                        // Try relative to project root first
+                        const projectPath = path.join(__dirname, '../..', actualContentPath);
+                        if (fs.existsSync(projectPath)) {
+                            actualContentPath = projectPath;
+                        }
+                        else {
+                            // Don't use hardcoded fallback - fail clearly
+                            throw new Error(`Content file not found: ${params.contentFile}. Tried: ${actualContentPath} and ${projectPath}`);
                         }
                     }
                     if (!fs.existsSync(actualContentPath)) {
-                        throw new Error(`Content file not found: ${params.contentFile}. Tried: ${actualContentPath}`);
+                        throw new Error(`Content file not found: ${params.contentFile}. Path: ${actualContentPath}`);
                     }
                     finalContent = fs.readFileSync(actualContentPath, 'utf-8');
                 }

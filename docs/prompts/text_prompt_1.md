@@ -1,4 +1,4 @@
-Use the writing assistant process chapter tool:
+Use the writing assistant tool:
 
 <prompt>
 
@@ -34,3 +34,6 @@ Return the summary in JSON format with the following fields:
 </prompt>
 
 Your job after that is to let me know where the json file has been saved and the filename.
+
+---
+If you receive an error an unexpected response, please record the error using your memory tool. Then stop and ask for further instructions.
