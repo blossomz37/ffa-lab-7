@@ -11,12 +11,18 @@ This project demonstrates:
 
 ## 🛠️ Consolidated Architecture 
 
-**4 MCP Tools:**
+**4 MCP Tools with Advanced Features:**
 
-1. **`generate_content`** - Unified text/image generation
-2. **`generate_image`** - Standalone image creation  
-3. **`writers_room`** - Multi-persona discussions and chat
+1. **`generate_content`** - Unified text/image generation with **attachment processing**
+2. **`generate_image`** - Standalone image creation with **aspect ratio & resolution control**  
+3. **`writers_room`** - Multi-persona discussions and interactive chat
 4. **`writers_room_session`** - Persistent session management
+
+**✨ New Features:**
+- **🔗 Automatic attachment processing** - Drag & drop files into Claude Desktop
+- **📐 Advanced image control** - Aspect ratios (16:9, square, etc.) and resolution hints
+- **📝 8192-token responses** - Extended length for detailed analysis
+- **🛡️ Improved reliability** - Fixed content mix-up bugs and file resolution issues
 
 ## 🏗️ Project Structure
 
@@ -75,10 +81,12 @@ The system includes 4 AI personas, each using different models:
 ## 💻 Technical Highlights
 
 - **Pure TypeScript MCP Server** - No Python subprocess dependencies
-- **Rate Limiting & Concurrency** - Professional API handling
+- **MCP Resource Protocol** - Automatic attachment processing via ListResources/ReadResource
+- **Rate Limiting & Concurrency** - Professional API handling (2 RPS, max 2 concurrent)
 - **Smart Fallback Mechanisms** - Graceful degradation on failures
 - **Dynamic Mode Detection** - Automatic chat vs discussion modes
-- **File Reference Resolution** - Environment variable mapping
+- **Advanced Image Generation** - Aspect ratio and resolution control
+- **8192-Token Responses** - Extended length for detailed content analysis
 
 ## 🎓 Learning Objectives
 
@@ -114,12 +122,13 @@ See `CLAUDE.md` for complete technical documentation including:
 
 ## 🎯 Assignment Ideas
 
-- Extend with new MCP tools
-- Add persona customization
-- Implement conversation memory
-- Add new AI model integrations
-- Create web interface
-- Build conversation analytics
+- **MCP Extensions**: Add new tools (summarization, translation, etc.)
+- **Persona Customization**: User-configurable personas and models  
+- **Advanced Resources**: Support binary files, images as context
+- **Conversation Memory**: Long-term session persistence across restarts
+- **Model Orchestration**: Dynamic model selection based on task type
+- **Web Interface**: Claude Desktop alternative with custom UI
+- **Analytics Dashboard**: Track usage, persona effectiveness, token consumption
 
 ---
 
