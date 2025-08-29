@@ -109,7 +109,7 @@ class RateLimiter {
 const concurrency = new Semaphore(MAX_CONCURRENT_TASKS);
 const openrouterLimiter = new RateLimiter(OPENROUTER_RPS);
 // Helper functions
-async function makeOpenRouterRequest(messages, model, temperature = 0.7, maxTokens = 4096, retries = 2) {
+async function makeOpenRouterRequest(messages, model, temperature = 0.7, maxTokens = 8192, retries = 2) {
     await openrouterLimiter.take();
     await concurrency.acquire();
     try {
@@ -301,6 +301,14 @@ const TOOLS = [
                 description: { type: 'string', description: 'Image description/prompt' },
                 context: { type: 'string', description: 'Additional context for the image' },
                 styleHints: { type: 'string', description: 'Style instructions (e.g., "cyberpunk, noir")' },
+                aspectRatio: {
+                    type: 'string',
+                    description: 'Aspect ratio (e.g., "16:9", "1:1", "4:3", "9:16", "widescreen", "square", "portrait")'
+                },
+                resolution: {
+                    type: 'string',
+                    description: 'Resolution hint (e.g., "4K", "HD", "1920x1080", "high resolution")'
+                },
                 outputFilename: { type: 'string', description: 'Filename for saved image' },
                 model: { type: 'string', description: 'Override the default image model' }
             },
@@ -448,7 +456,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 }
                 messages.push({ role: 'user', content: userContent });
                 // Generate text
-                const response = await makeOpenRouterRequest(messages, params.model || TEXT_MODEL, params.temperature || 0.7, params.maxTokens || 4096);
+                const response = await makeOpenRouterRequest(messages, params.model || TEXT_MODEL, params.temperature || 0.7, params.maxTokens || 8192);
                 const textContent = response.choices[0].message.content;
                 let result = textContent;
                 // Save text output if requested
@@ -510,6 +518,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     systemPrompt += ` Apply these style elements: ${params.styleHints}`;
                 }
                 let userPrompt = `Generate an image: ${params.description}`;
+                // Add aspect ratio to the prompt
+                if (params.aspectRatio) {
+                    userPrompt += ` | Aspect ratio: ${params.aspectRatio}`;
+                }
+                // Add resolution to the prompt
+                if (params.resolution) {
+                    userPrompt += ` | Resolution: ${params.resolution}`;
+                }
                 if (params.context) {
                     userPrompt = `Context: ${params.context}\n\n${userPrompt}`;
                 }
@@ -623,7 +639,7 @@ Respond in character, focusing on your area of expertise. Be constructive but ho
                         { role: 'system', content: systemMessage },
                         { role: 'user', content: conversationContext }
                     ];
-                    const response = await makeOpenRouterRequest(messages, targetPersona.model, 0.8, 2048);
+                    const response = await makeOpenRouterRequest(messages, targetPersona.model, 0.8, 8192);
                     const responseContent = response.choices[0].message.content;
                     return {
                         content: [
@@ -705,7 +721,7 @@ Respond in character, focusing on your area of expertise. Be constructive but ho
                                 { role: 'system', content: systemMessage },
                                 { role: 'user', content: conversationContext }
                             ];
-                            const response = await makeOpenRouterRequest(messages, persona.model, 0.8, 2048);
+                            const response = await makeOpenRouterRequest(messages, persona.model, 0.8, 8192);
                             const responseContent = response.choices[0].message.content;
                             const responseData = {
                                 persona: personaKey,

@@ -34,7 +34,7 @@ cd tests
 python quick_mcp_test.py
 ```
 
-### Full Test Suite (if available)
+### Full Test Suite
 ```bash
 cd tests
 python run_consolidated_tests.py
@@ -43,21 +43,47 @@ python run_consolidated_tests.py
 ### Individual Testing
 Test individual tools via Claude Desktop once the MCP server is running.
 
-## Test Structure
+## Test File Architecture
+
+### Two-File Test System
+
+The testing system uses a **separation of concerns** pattern:
+
+1. **`run_consolidated_tests.py`** (Test Runner/Orchestrator)
+   - **Role**: Entry point and test orchestrator
+   - **Purpose**: Provides clean wrapper with nice formatting
+   - **What it does**:
+     - Shows intro banner with list of 4 tools being tested
+     - Executes `test_consolidated_mcp.py` as a subprocess
+     - Reports overall pass/fail status
+     - Handles interrupts gracefully
+
+2. **`test_consolidated_mcp.py`** (Actual Test Implementation)
+   - **Role**: Contains the actual test logic
+   - **Purpose**: Validates each MCP tool's availability and functionality
+   - **What it does**:
+     - Runs handshake script to get available tools list
+     - Checks MCP server startup
+     - Verifies each of the 4 consolidated tools exists
+     - Reports detailed test results for each tool
+
+**Why this pattern?**
+- **Separation of concerns**: Runner handles orchestration, tests handle validation
+- **Better error handling**: Runner can catch test crashes cleanly
+- **Improved output**: Runner provides consistent formatting regardless of test outcomes
+- **Flexibility**: You can run tests directly or through the runner
+
+### Test Structure
 
 ```
 tests/
 ├── quick_mcp_test.py           # Quick consolidation verification
-├── run_consolidated_tests.py   # Full test runner
-├── test_config.py              # Configuration tests (unchanged)
-├── archived_old_tests/         # Pre-consolidation tests
-│   ├── test_text_generator.py
-│   ├── test_image_generator.py
-│   ├── test_writers_room.py
-│   ├── test_docx_editor.py
-│   └── ... (other old tests)
+├── run_consolidated_tests.py   # Test orchestrator (wrapper)
+├── test_consolidated_mcp.py    # Actual test implementation
+├── test_config.py              # Shared configuration and utilities
 ├── tests_input/                # Test input data
-└── tests_output/               # Test output files
+│   └── test_the_little_prince_and_the_pauper.md
+└── tests_output/               # Test output files (gitignored)
 ```
 
 ## Benefits of Consolidation

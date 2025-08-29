@@ -129,7 +129,7 @@ async function makeOpenRouterRequest(
   messages: any[],
   model: string,
   temperature: number = 0.7,
-  maxTokens: number = 4096,
+  maxTokens: number = 8192,
   retries: number = 2
 ): Promise<any> {
   await openrouterLimiter.take();
@@ -342,6 +342,14 @@ const TOOLS: Tool[] = [
         description: { type: 'string', description: 'Image description/prompt' },
         context: { type: 'string', description: 'Additional context for the image' },
         styleHints: { type: 'string', description: 'Style instructions (e.g., "cyberpunk, noir")' },
+        aspectRatio: { 
+          type: 'string', 
+          description: 'Aspect ratio (e.g., "16:9", "1:1", "4:3", "9:16", "widescreen", "square", "portrait")' 
+        },
+        resolution: {
+          type: 'string',
+          description: 'Resolution hint (e.g., "4K", "HD", "1920x1080", "high resolution")'
+        },
         outputFilename: { type: 'string', description: 'Filename for saved image' },
         model: { type: 'string', description: 'Override the default image model' }
       },
@@ -509,7 +517,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           messages,
           params.model || TEXT_MODEL,
           params.temperature || 0.7,
-          params.maxTokens || 4096
+          params.maxTokens || 8192
         );
         
         const textContent = response.choices[0].message.content;
@@ -581,6 +589,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
         
         let userPrompt = `Generate an image: ${params.description}`;
+        
+        // Add aspect ratio to the prompt
+        if (params.aspectRatio) {
+          userPrompt += ` | Aspect ratio: ${params.aspectRatio}`;
+        }
+        
+        // Add resolution to the prompt
+        if (params.resolution) {
+          userPrompt += ` | Resolution: ${params.resolution}`;
+        }
+        
         if (params.context) {
           userPrompt = `Context: ${params.context}\n\n${userPrompt}`;
         }
@@ -720,7 +739,7 @@ Respond in character, focusing on your area of expertise. Be constructive but ho
             { role: 'user', content: conversationContext }
           ];
           
-          const response = await makeOpenRouterRequest(messages, targetPersona.model, 0.8, 2048);
+          const response = await makeOpenRouterRequest(messages, targetPersona.model, 0.8, 8192);
           const responseContent = response.choices[0].message.content;
           
           return {
@@ -807,7 +826,7 @@ Respond in character, focusing on your area of expertise. Be constructive but ho
                 { role: 'user', content: conversationContext }
               ];
               
-              const response = await makeOpenRouterRequest(messages, persona.model, 0.8, 2048);
+              const response = await makeOpenRouterRequest(messages, persona.model, 0.8, 8192);
               const responseContent = response.choices[0].message.content;
               
               const responseData = {

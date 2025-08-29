@@ -30,3 +30,9 @@ output/
 
 # Archive (development artifacts not for sharing)
 .archive/
+
+# My Files
+memory/
+output/mcp_images/
+output/mcp_text/
+output/writers_room/
