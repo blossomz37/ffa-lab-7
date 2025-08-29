@@ -9,7 +9,10 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
+  ListResourcesRequestSchema,
+  ReadResourceRequestSchema,
   Tool,
+  Resource,
 } from '@modelcontextprotocol/sdk/types.js';
 import fetch from 'node-fetch';
 import * as fs from 'fs';
@@ -420,6 +423,68 @@ const TOOLS: Tool[] = [
   }
 ];
 
+// Resource handling for attachments
+const availableResources: Map<string, Resource> = new Map();
+
+// Handle resource listing
+server.setRequestHandler(ListResourcesRequestSchema, async () => {
+  debugLog('Listing resources:', Array.from(availableResources.keys()));
+  return {
+    resources: Array.from(availableResources.values())
+  };
+});
+
+// Handle resource reading
+server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+  const { uri } = request.params;
+  debugLog(`Reading resource: ${uri}`);
+  
+  // Check if it's a file:// URI
+  if (uri.startsWith('file://')) {
+    const filePath = uri.replace('file://', '');
+    if (fs.existsSync(filePath)) {
+      const content = fs.readFileSync(filePath, 'utf-8');
+      const mimeType = filePath.endsWith('.md') ? 'text/markdown' : 
+                       filePath.endsWith('.json') ? 'application/json' :
+                       filePath.endsWith('.yaml') || filePath.endsWith('.yml') ? 'text/yaml' :
+                       'text/plain';
+      
+      // Store as available resource
+      const resource: Resource = {
+        uri,
+        name: path.basename(filePath),
+        mimeType,
+        description: `File: ${path.basename(filePath)}`
+      };
+      availableResources.set(uri, resource);
+      
+      return {
+        contents: [{
+          uri,
+          mimeType,
+          text: content
+        }]
+      };
+    }
+  }
+  
+  // Check stored resources
+  const resource = availableResources.get(uri);
+  if (resource) {
+    // For now, we don't store content separately, just metadata
+    // In a real implementation, you'd store the content too
+    return {
+      contents: [{
+        uri,
+        mimeType: resource.mimeType || 'text/plain',
+        text: `Resource ${uri} is available but content not cached`
+      }]
+    };
+  }
+  
+  throw new Error(`Resource not found: ${uri}`);
+});
+
 // Handle tool listing
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: TOOLS
@@ -435,9 +500,32 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'generate_content': {
         const params = args as any;
         
+        // Check for attached resources first
+        let attachedContent = '';
+        if (availableResources.size > 0) {
+          debugLog(`Found ${availableResources.size} attached resources`);
+          // Get the most recent resources (Claude Desktop typically sends attachments as resources)
+          for (const [uri, resource] of availableResources) {
+            try {
+              // Try to read the resource content
+              if (uri.startsWith('file://')) {
+                const filePath = uri.replace('file://', '');
+                if (fs.existsSync(filePath)) {
+                  const content = fs.readFileSync(filePath, 'utf-8');
+                  attachedContent += `\n\n--- Attached: ${resource.name} ---\n${content}\n---\n`;
+                  debugLog(`Added attached resource: ${resource.name}`);
+                }
+              }
+            } catch (err) {
+              debugLog(`Error reading resource ${uri}:`, err);
+            }
+          }
+        }
+        
         // Build prompt from various sources
         let finalPrompt = params.prompt || '';
-        let finalContent = params.content || '';
+        // Prefer: 1) direct content, 2) attached resources, 3) file path
+        let finalContent = params.content || attachedContent || '';
         
         // Handle prompt file
         if (params.promptFile) {
@@ -471,8 +559,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           finalPrompt = fs.readFileSync(actualPromptPath, 'utf-8');
         }
         
-        // Handle content file
-        if (params.contentFile) {
+        // Handle content file (only if no content already loaded from attachments)
+        if (params.contentFile && !finalContent) {
           let actualContentPath = params.contentFile;
           
           // Check if it's a reference to an env variable
