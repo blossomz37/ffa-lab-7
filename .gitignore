@@ -1,0 +1,32 @@
+# Environment variables - contains API keys and personal paths
+.env
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# Output files and logs
+output/
+*.log
+
+# Archive (development artifacts not for sharing)
+.archive/

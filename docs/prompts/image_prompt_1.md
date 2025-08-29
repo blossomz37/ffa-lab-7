@@ -1,0 +1,1 @@
+Please generate the promotional image.
