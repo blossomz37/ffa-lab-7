@@ -55,6 +55,7 @@ const OUTPUT_WRITERS_ROOM = path.join(OUTPUT_DIR, 'writers_room');
 // Concurrency and rate limiting
 const MAX_CONCURRENT_TASKS = parseInt(process.env.MAX_CONCURRENT_TASKS || '2', 10);
 const OPENROUTER_RPS = parseInt(process.env.OPENROUTER_RPS || '2', 10);
+const REQUEST_TIMEOUT_MS = parseInt(process.env.REQUEST_TIMEOUT_MS || '60000', 10);
 class Semaphore {
     max;
     count = 0;
@@ -109,12 +110,14 @@ class RateLimiter {
 const concurrency = new Semaphore(MAX_CONCURRENT_TASKS);
 const openrouterLimiter = new RateLimiter(OPENROUTER_RPS);
 // Helper functions
-async function makeOpenRouterRequest(messages, model, temperature = 0.7, maxTokens = 8192, retries = 2) {
+async function makeOpenRouterRequest(messages, model, temperature = 0.7, maxTokens = 8192, retries = 2, timeoutMs = REQUEST_TIMEOUT_MS) {
     await openrouterLimiter.take();
     await concurrency.acquire();
     try {
         for (let attempt = 0; attempt <= retries; attempt++) {
             try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
                 const response = await fetch(OPENROUTER_BASE_URL, {
                     method: 'POST',
                     headers: {
@@ -131,8 +134,10 @@ async function makeOpenRouterRequest(messages, model, temperature = 0.7, maxToke
                         top_p: 1,
                         frequency_penalty: 0,
                         presence_penalty: 0
-                    })
+                    }),
+                    signal: controller.signal
                 });
+                clearTimeout(timeoutId);
                 if (!response.ok) {
                     let error = await response.text();
                     if (error && error.length > 512)
@@ -151,6 +156,11 @@ async function makeOpenRouterRequest(messages, model, temperature = 0.7, maxToke
             }
             catch (err) {
                 debugLog(`Attempt ${attempt + 1} failed for model ${model}:`, err);
+                // If aborted due to timeout, don't retry endlessly; allow next retry or fail
+                if (err?.name === 'AbortError') {
+                    if (attempt === retries)
+                        throw new Error(`Request timed out after ${timeoutMs}ms`);
+                }
                 if (attempt === retries)
                     throw err;
                 await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000));
@@ -764,9 +774,22 @@ Respond in character, focusing on your area of expertise. Be constructive but ho
                     const discussion = [];
                     const allResponses = [];
                     const rounds = params.rounds || 1;
+                    let hadErrors = false;
+                    const maxDurationMs = parseInt(process.env.WRITERS_ROOM_MAX_DURATION_MS || '110000', 10);
+                    const deadline = Date.now() + Math.max(10000, maxDurationMs);
                     for (let round = 0; round < rounds; round++) {
                         const roundResponses = [];
                         for (const personaKey of personasToUse) {
+                            if (Date.now() > deadline) {
+                                hadErrors = true;
+                                roundResponses.push({
+                                    persona: personaKey,
+                                    name: personas.get(personaKey)?.name || personaKey,
+                                    role: personas.get(personaKey)?.role || 'Writer',
+                                    content: 'Stopped due to time budget; consider fewer rounds/personas or increase WRITERS_ROOM_MAX_DURATION_MS.'
+                                });
+                                continue;
+                            }
                             const persona = personas.get(personaKey);
                             if (!persona)
                                 continue;
@@ -808,8 +831,15 @@ Respond in character, focusing on your area of expertise. Be constructive but ho
                                 { role: 'system', content: systemMessage },
                                 { role: 'user', content: conversationContext }
                             ];
-                            const response = await makeOpenRouterRequest(messages, persona.model, 0.8, 8192);
-                            const responseContent = response.choices[0].message.content;
+                            let responseContent;
+                            try {
+                                const response = await makeOpenRouterRequest(messages, persona.model, 0.8, 8192);
+                                responseContent = response.choices[0].message.content;
+                            }
+                            catch (e) {
+                                hadErrors = true;
+                                responseContent = `Error from ${persona.name}: ${e?.message || String(e)}`;
+                            }
                             const responseData = {
                                 persona: personaKey,
                                 name: persona.name,
@@ -835,6 +865,9 @@ Respond in character, focusing on your area of expertise. Be constructive but ho
                     }, null, 2));
                     // Create readable output
                     let readableOutput = `# Writer's Room Discussion\n\nTopic: ${params.topic || params.message}\n\n`;
+                    if (hadErrors) {
+                        readableOutput += `Note: Some persona responses failed or timed out. Partial results shown.\n\n`;
+                    }
                     for (const round of discussion) {
                         readableOutput += `\n## Round ${round.round}\n\n`;
                         for (const response of round.responses) {

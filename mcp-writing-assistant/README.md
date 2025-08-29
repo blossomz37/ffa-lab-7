@@ -66,6 +66,12 @@ text_model_6=deepseek/deepseek-chat-v3-0324
 writers_room_persona_1=docs/writers_room_personas/persona_1.yaml
 writers_room_persona_2=docs/writers_room_personas/persona_2.yaml
 # ... etc
+
+# Timeouts and limits
+# Per-request timeout for LLM calls (ms)
+REQUEST_TIMEOUT_MS=60000
+# Max total duration for writers_room discussion before returning partial results (ms)
+WRITERS_ROOM_MAX_DURATION_MS=110000
 ```
 
 ## Environment
