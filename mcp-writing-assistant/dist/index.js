@@ -260,6 +260,7 @@ const server = new Server({
 }, {
     capabilities: {
         tools: {},
+        resources: {},
     },
 });
 // MCP server status
